@@ -18,7 +18,7 @@ using Forms = System.Windows.Forms;
 [assembly: System.Reflection.AssemblyTitle("原彩显示")]
 [assembly: System.Reflection.AssemblyDescription("北京日照与手动屏幕色温调节")]
 [assembly: System.Reflection.AssemblyProduct("原彩显示")]
-[assembly: System.Reflection.AssemblyVersion("1.2.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.2.1.0")]
 namespace AmbientTone {
  public static class Beijing {
   public static DateTime Now {get{return DateTime.SpecifyKind(DateTime.UtcNow.AddHours(8),DateTimeKind.Unspecified);}}
