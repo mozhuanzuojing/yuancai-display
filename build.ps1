@@ -1,10 +1,10 @@
-param([switch]$Test)
+﻿param([switch]$Test)
 $ErrorActionPreference = 'Stop'
 $appDir = $PSScriptRoot
 $framework = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319'
 $metadata = Join-Path $env:WINDIR 'System32\WinMetadata'
 $compiler = Join-Path $framework 'csc.exe'
-$refs = @('System.dll','System.Core.dll','System.Xml.dll','System.Drawing.dll','System.Windows.Forms.dll','System.Xaml.dll','WindowsBase.dll','PresentationCore.dll','PresentationFramework.dll','System.Runtime.dll','System.Runtime.WindowsRuntime.dll')
+$refs = @('System.dll','System.Core.dll','System.Xml.dll','System.Management.dll','System.Drawing.dll','System.Windows.Forms.dll','System.Xaml.dll','WindowsBase.dll','PresentationCore.dll','PresentationFramework.dll','System.Runtime.dll','System.Runtime.WindowsRuntime.dll')
 $arguments = @('/nologo','/target:winexe','/platform:anycpu','/optimize+',('/win32manifest:' + (Join-Path $appDir 'app.manifest')),('/out:' + (Join-Path $appDir '原彩显示.exe')),('/resource:' + (Join-Path $appDir 'MainWindow.xaml') + ',MainWindow.xaml'))
 $arguments += '/win32icon:' + (Join-Path $appDir 'Assets\app-icon.ico')
 $arguments += '/resource:' + (Join-Path $appDir 'Assets\app-icon.png') + ',AppIcon.png'
@@ -12,6 +12,7 @@ foreach ($ref in $refs) { $refPath = Join-Path $framework $ref; if (-not (Test-P
 $arguments += '/r:' + (Join-Path $metadata 'Windows.Devices.winmd')
 $arguments += '/r:' + (Join-Path $metadata 'Windows.Foundation.winmd')
 $arguments += Join-Path $appDir 'AmbientTone.cs'
+$arguments += Join-Path $appDir 'Brightness.cs'
 & $compiler @arguments
 if ($LASTEXITCODE -ne 0) { throw 'Build failed' }
 if ($Test) {
@@ -19,5 +20,3 @@ if ($Test) {
  if ($process.ExitCode -ne 0) { throw 'Self tests failed' }
  Get-Content -LiteralPath (Join-Path $appDir 'test-results.txt')
 }
-
-

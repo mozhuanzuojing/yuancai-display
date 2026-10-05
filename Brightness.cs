@@ -1,0 +1,69 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Management;
+using System.Runtime.InteropServices;
+using System.Text.RegularExpressions;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Media;
+using System.Windows.Threading;
+namespace AmbientTone {
+ // Independent implementation of the WMI / DDC brightness approach documented by PowerToys PowerDisplay.
+ public sealed class BrightnessDevice {
+  public string Key,Label,Kind,ReadPath,WritePath;public IntPtr Handle;public uint Max;public int Current,Original;public int[] Levels;
+ }
+ public sealed class BrightnessService:IDisposable {
+  readonly object gate=new object();readonly Dictionary<string,int> initial=new Dictionary<string,int>();List<BrightnessDevice> devices=new List<BrightnessDevice>();bool disposed;
+  [StructLayout(LayoutKind.Sequential)]struct Rect{public int Left,Top,Right,Bottom;}
+  [StructLayout(LayoutKind.Sequential,CharSet=CharSet.Unicode)]struct MonitorInfo{public int Size;public Rect Monitor,Work;public uint Flags;[MarshalAs(UnmanagedType.ByValTStr,SizeConst=32)]public string Device;}
+  [StructLayout(LayoutKind.Sequential,CharSet=CharSet.Unicode)]struct PhysicalMonitor{public IntPtr Handle;[MarshalAs(UnmanagedType.ByValTStr,SizeConst=128)]public string Description;}
+  delegate bool MonitorCallback(IntPtr monitor,IntPtr dc,ref Rect rect,IntPtr data);
+  [DllImport("user32.dll")]static extern bool EnumDisplayMonitors(IntPtr dc,IntPtr clip,MonitorCallback callback,IntPtr data);
+  [DllImport("user32.dll",CharSet=CharSet.Unicode)]static extern bool GetMonitorInfo(IntPtr monitor,ref MonitorInfo info);
+  [DllImport("dxva2.dll")]static extern bool GetNumberOfPhysicalMonitorsFromHMONITOR(IntPtr monitor,out uint count);
+  [DllImport("dxva2.dll",CharSet=CharSet.Unicode)]static extern bool GetPhysicalMonitorsFromHMONITOR(IntPtr monitor,uint count,[Out]PhysicalMonitor[] physical);
+  [DllImport("dxva2.dll")]static extern bool DestroyPhysicalMonitor(IntPtr handle);
+  [DllImport("dxva2.dll")]static extern bool GetVCPFeatureAndVCPFeatureReply(IntPtr handle,byte code,out uint type,out uint current,out uint maximum);
+  [DllImport("dxva2.dll")]static extern bool SetVCPFeature(IntPtr handle,byte code,uint value);
+  static string Identity(string value){string s=(value??"").Replace('#','\\');int start=s.IndexOf("DISPLAY\\",StringComparison.OrdinalIgnoreCase);if(start>=0)s=s.Substring(start);int guid=s.IndexOf("\\{",StringComparison.Ordinal);if(guid>=0)s=s.Substring(0,guid);return Regex.Replace(s,@"_\d+$","").ToUpperInvariant();}
+  static ManagementObjectSearcher Query(string text){return new ManagementObjectSearcher(@"root\WMI",text,new EnumerationOptions{ReturnImmediately=false,Timeout=TimeSpan.FromSeconds(3)});}
+  void Release(){foreach(var d in devices)if(d.Handle!=IntPtr.Zero){DestroyPhysicalMonitor(d.Handle);d.Handle=IntPtr.Zero;}devices.Clear();}
+  void Add(BrightnessDevice d){int baseline;if(initial.TryGetValue(d.Key,out baseline))d.Original=baseline;else{d.Original=d.Current;initial[d.Key]=d.Current;}devices.Add(d);}
+  public List<BrightnessDevice> Discover(){lock(gate){if(disposed)throw new ObjectDisposedException("BrightnessService");Release();var active=Native.Displays();var wmiGdi=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+   try{var methods=new Dictionary<string,string>(StringComparer.OrdinalIgnoreCase);using(var search=Query("SELECT * FROM WmiMonitorBrightnessMethods WHERE Active=TRUE"))using(var rows=search.Get())foreach(ManagementObject row in rows)using(row){methods[Identity(Convert.ToString(row["InstanceName"]))]=row.Path.Path;}
+    using(var search=Query("SELECT * FROM WmiMonitorBrightness WHERE Active=TRUE"))using(var rows=search.Get())foreach(ManagementObject row in rows)using(row){string key=Identity(Convert.ToString(row["InstanceName"])),write;var match=active.FirstOrDefault(d=>Identity(d.Id)==key);if(match==null||!methods.TryGetValue(key,out write))continue;var levels=row["Level"] as byte[];Add(new BrightnessDevice{Key=key,Label="内置屏幕",Kind="WMI",ReadPath=row.Path.Path,WritePath=write,Current=Convert.ToInt32(row["CurrentBrightness"]),Levels=levels==null?null:levels.Select(v=>(int)v).ToArray()});wmiGdi.Add(match.Name);}
+   }catch(Exception e){Storage.Log("Brightness WMI discovery: "+e.Message);}
+   MonitorCallback callback=delegate(IntPtr monitor,IntPtr dc,ref Rect rect,IntPtr data){var info=new MonitorInfo{Size=Marshal.SizeOf(typeof(MonitorInfo))};if(!GetMonitorInfo(monitor,ref info)||wmiGdi.Contains(info.Device))return true;uint count;if(!GetNumberOfPhysicalMonitorsFromHMONITOR(monitor,out count)||count==0||count>16)return true;var physical=new PhysicalMonitor[count];if(!GetPhysicalMonitorsFromHMONITOR(monitor,count,physical))return true;
+    for(int i=0;i<physical.Length;i++){bool kept=false;try{uint type,current,max;if(GetVCPFeatureAndVCPFeatureReply(physical[i].Handle,0x10,out type,out current,out max)&&max>0&&current<=max){var match=active.FirstOrDefault(d=>d.Name==info.Device);string key=(match==null?info.Device:match.Id)+"/DDC/"+i;Add(new BrightnessDevice{Key=key,Label="外接屏幕 · "+(String.IsNullOrWhiteSpace(physical[i].Description)?info.Device:physical[i].Description),Kind="DDC/CI",Handle=physical[i].Handle,Max=max,Current=(int)Math.Round(current*100.0/max)});kept=true;}}catch(Exception e){Storage.Log("Brightness DDC discovery: "+e.Message);}finally{if(!kept)DestroyPhysicalMonitor(physical[i].Handle);}}
+    return true;};EnumDisplayMonitors(IntPtr.Zero,IntPtr.Zero,callback,IntPtr.Zero);GC.KeepAlive(callback);return new List<BrightnessDevice>(devices);
+  }}
+  void Check(BrightnessDevice d){if(disposed||!devices.Contains(d))throw new InvalidOperationException("屏幕已断开或重新检测，请重新选择。");}
+  int ReadCore(BrightnessDevice d){if(d.Kind=="WMI"){using(var row=new ManagementObject(d.ReadPath)){row.Get();return Convert.ToInt32(row["CurrentBrightness"]);}}uint type,current,max;if(!GetVCPFeatureAndVCPFeatureReply(d.Handle,0x10,out type,out current,out max)||max==0||current>max)throw new InvalidOperationException("显示器未返回有效亮度。");d.Max=max;return(int)Math.Round(current*100.0/max);}
+  public int Read(BrightnessDevice d){lock(gate){Check(d);return d.Current=ReadCore(d);}}
+  public int Set(BrightnessDevice d,int percent){lock(gate){Check(d);percent=(int)Model.Clamp(percent,0,100);if(d.Levels!=null&&d.Levels.Length>0)percent=d.Levels.OrderBy(v=>Math.Abs(v-percent)).First();if(ReadCore(d)==percent)return d.Current=percent;
+   if(d.Kind=="WMI"){using(var row=new ManagementObject(d.WritePath)){using(var input=row.GetMethodParameters("WmiSetBrightness")){input["Timeout"]=(uint)0;input["Brightness"]=(byte)percent;using(var result=row.InvokeMethod("WmiSetBrightness",input,null)){if(result==null||Convert.ToUInt32(result["ReturnValue"])!=0)throw new InvalidOperationException("系统未接受亮度调节。");}}}}
+   else{uint raw=(uint)Math.Round(d.Max*percent/100.0);if(!SetVCPFeature(d.Handle,0x10,raw))throw new InvalidOperationException("显示器未接受亮度调节，请检查 DDC/CI。");percent=(int)Math.Round(raw*100.0/d.Max);}
+   int actual=-1;for(int attempt=0;attempt<4;attempt++){actual=ReadCore(d);if(Math.Abs(actual-percent)<=(d.Kind=="WMI"?0:1))return d.Current=actual;Thread.Sleep(120);}throw new InvalidOperationException("未确认目标亮度，当前读数 "+actual+"%。");
+  }}
+  public void Dispose(){lock(gate){if(disposed)return;disposed=true;Release();}}
+ }
+ public sealed class BrightnessUI:IDisposable {
+  sealed class Row{public BrightnessDevice Device;public Slider Slider;public TextBlock Value;public Button Restore;public DispatcherTimer Debounce;public bool Quiet,Busy;public int Revision;}
+  readonly BrightnessService service=new BrightnessService();readonly StackPanel panel;readonly TextBlock status;readonly Button refresh;readonly List<Row> rows=new List<Row>();readonly DispatcherTimer poll=new DispatcherTimer();bool disposed,refreshing;int generation;
+  public bool Ready {get{return generation>0&&!refreshing;}}public int DeviceCount{get{return rows.Count;}}
+  public BrightnessUI(StackPanel panel,TextBlock status,Button refresh,bool preview){this.panel=panel;this.status=status;this.refresh=refresh;if(preview){status.Text="亮度预览 · 启动时读取屏幕当前亮度";var fake=new Slider{Minimum=0,Maximum=100,Value=70,IsEnabled=false,Margin=new Thickness(0,10,0,0)};panel.Children.Add(new TextBlock{Text="内置屏幕 · 70%"});panel.Children.Add(fake);return;}refresh.Click+=delegate{Refresh();};poll.Interval=TimeSpan.FromSeconds(5);poll.Tick+=async delegate{if(disposed||refreshing)return;foreach(var row in rows.ToArray()){if(row.Busy||row.Debounce.IsEnabled)continue;int revision=row.Revision;try{int actual=await Task.Run(()=>service.Read(row.Device));if(disposed)return;if(revision==row.Revision&&!row.Busy&&!row.Debounce.IsEnabled)ShowValue(row,actual);}catch{if(!disposed){status.Text="亮度读数暂不可用；可点击重新检测。";}}}};panel.Loaded+=delegate{if(!disposed&&generation==0){poll.Start();Refresh();}};}
+  static void ShowValue(Row row,int actual){row.Quiet=true;row.Slider.Value=actual;row.Value.Text=actual+"%";row.Quiet=false;}
+  public async void Refresh(){if(disposed||refreshing)return;refreshing=true;int version=++generation;refresh.IsEnabled=false;foreach(var row in rows){row.Debounce.Stop();row.Slider.IsEnabled=false;row.Restore.IsEnabled=false;}status.Text="正在检测硬件亮度…";try{var found=await Task.Run(()=>service.Discover());if(disposed||version!=generation)return;rows.Clear();panel.Children.Clear();foreach(var device in found){var row=new Row{Device=device};var header=new DockPanel();row.Value=new TextBlock{Text=device.Current+"%",HorizontalAlignment=HorizontalAlignment.Right};DockPanel.SetDock(row.Value,Dock.Right);header.Children.Add(row.Value);header.Children.Add(new TextBlock{Text=device.Label,TextWrapping=TextWrapping.Wrap});panel.Children.Add(header);
+    row.Slider=new Slider{Minimum=0,Maximum=100,Value=device.Current,TickFrequency=1,SmallChange=1,LargeChange=10,IsSnapToTickEnabled=true,Margin=new Thickness(0,10,0,8)};System.Windows.Automation.AutomationProperties.SetName(row.Slider,device.Label+"硬件亮度");panel.Children.Add(row.Slider);row.Restore=new Button{Content="恢复打开时亮度 · "+device.Original+"%",Margin=new Thickness(0,0,0,16),HorizontalAlignment=HorizontalAlignment.Left};panel.Children.Add(row.Restore);row.Debounce=new DispatcherTimer{Interval=TimeSpan.FromMilliseconds(250)};row.Debounce.Tick+=async delegate{row.Debounce.Stop();await Apply(row,(int)Math.Round(row.Slider.Value));};row.Slider.ValueChanged+=delegate{if(row.Quiet||disposed)return;row.Revision++;row.Value.Text=((int)Math.Round(row.Slider.Value))+"%";row.Debounce.Stop();row.Debounce.Start();};row.Restore.Click+=async delegate{row.Debounce.Stop();await Apply(row,row.Device.Original);};rows.Add(row);
+   }status.Text=found.Count==0?"未检测到可控制的硬件亮度。外接屏幕请确认支持并开启 DDC/CI。":"已检测到 "+found.Count+" 块可调屏幕 · 直接控制屏幕硬件亮度";
+  }catch(Exception e){if(!disposed)status.Text="亮度检测失败："+e.Message;}finally{if(!disposed){refreshing=false;refresh.IsEnabled=true;}}}
+  async Task Apply(Row row,int value){if(disposed||row.Busy)return;row.Busy=true;row.Slider.IsEnabled=false;row.Restore.IsEnabled=false;refresh.IsEnabled=false;status.Text="正在调节屏幕亮度…";try{int? confirmed=null;string error=null;try{confirmed=await Task.Run(()=>service.Set(row.Device,value));}catch(Exception e){error=e.Message;}if(disposed)return;if(confirmed.HasValue){ShowValue(row,confirmed.Value);status.Text="硬件亮度已设为 "+confirmed.Value+"% · 已读回核对";}else{status.Text="亮度未能确认："+error;try{int actual=await Task.Run(()=>service.Read(row.Device));if(!disposed)ShowValue(row,actual);}catch{}}}finally{row.Busy=false;if(!disposed){row.Slider.IsEnabled=true;row.Restore.IsEnabled=true;refresh.IsEnabled=!rows.Any(r=>r.Busy);}}}
+  static void PumpUntil(Func<bool> done,int timeout){var until=DateTime.UtcNow.AddMilliseconds(timeout);while(!done()&&DateTime.UtcNow<until){var frame=new DispatcherFrame();Dispatcher.CurrentDispatcher.BeginInvoke(DispatcherPriority.Background,new Action(()=>frame.Continue=false));Dispatcher.PushFrame(frame);Thread.Sleep(15);}if(!done())throw new TimeoutException("Brightness UI operation timed out");}
+  public int Verify(string path){var lines=new List<string>();int failures=0;Action<bool,string> check=(ok,name)=>{lines.Add((ok?"PASS ":"FAIL ")+name);if(!ok)failures++;};Row target=null;int original=0;try{PumpUntil(()=>Ready,12000);if(rows.Count==0){lines.Add("SKIP: no hardware brightness control available");return 2;}target=rows.First();original=service.Read(target.Device);var gamma=Native.Displays();int requested=original>=10?original-5:original+5;target.Slider.Value=requested;PumpUntil(()=>!target.Debounce.IsEnabled&&!target.Busy,8000);check(service.Read(target.Device)!=(int)original,"Slider changes hardware brightness");check(target.Value.Text==service.Read(target.Device)+"%","Displayed percentage matches hardware readback");check(gamma.All(d=>Model.Close(Native.Read(d.Name),d.Original,0)),"Hardware brightness does not alter color ramps");target.Restore.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));PumpUntil(()=>!target.Busy,8000);check(service.Read(target.Device)==target.Device.Original,"Restore button returns session brightness");}catch(Exception e){lines.Add("FAIL "+e.Message);failures++;}finally{if(target!=null)try{service.Set(target.Device,original);check(service.Read(target.Device)==original,"Test restores original hardware brightness");}catch(Exception e){lines.Add("FAIL brightness recovery: "+e.Message);failures++;}File.WriteAllLines(path,lines);}return failures==0?0:1;}
+  public void Dispose(){if(disposed)return;disposed=true;generation++;poll.Stop();foreach(var row in rows)row.Debounce.Stop();Task.Run(()=>service.Dispose());}
+ }
+}

@@ -18,7 +18,7 @@ using Forms = System.Windows.Forms;
 [assembly: System.Reflection.AssemblyTitle("原彩显示")]
 [assembly: System.Reflection.AssemblyDescription("北京日照与手动屏幕色温调节")]
 [assembly: System.Reflection.AssemblyProduct("原彩显示")]
-[assembly: System.Reflection.AssemblyVersion("1.1.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.2.0.0")]
 namespace AmbientTone {
  public static class Beijing {
   public static DateTime Now {get{return DateTime.SpecifyKind(DateTime.UtcNow.AddHours(8),DateTimeKind.Unspecified);}}
@@ -166,7 +166,7 @@ namespace AmbientTone {
  }
  public sealed class UI {
   public Window Window;Settings settings;Controller controller;LightReader light;bool ready,exiting,paused;double current=6500;int tick;double lastTemp=-1,lastStrength=-1;
-  DispatcherTimer timer;Forms.NotifyIcon tray;EventWaitHandle resetSignal;
+  DispatcherTimer timer;Forms.NotifyIcon tray;EventWaitHandle resetSignal;BrightnessUI brightness;
   T Get<T>(string name)where T:class{return Window.FindName(name)as T;}
   public UI(bool preview) {
    using(var stream=typeof(UI).Assembly.GetManifestResourceStream("MainWindow.xaml"))Window=(Window)XamlReader.Load(stream);using(var icon=typeof(UI).Assembly.GetManifestResourceStream("AppIcon.png"))Window.Icon=BitmapFrame.Create(icon,BitmapCreateOptions.None,BitmapCacheOption.OnLoad);
@@ -189,7 +189,7 @@ namespace AmbientTone {
    Get<Button>("WarmButton").Click+=delegate{Preset(4200);};Get<Button>("SoftButton").Click+=delegate{Preset(5000);};Get<Button>("NeutralButton").Click+=delegate{Preset(6500);};
    Get<Button>("DriftResetButton").Click+=delegate{Get<Slider>("DriftSlider").Value=0;};Get<Button>("ResetButton").Click+=delegate{Reset();};Get<Button>("ExitButton").Click+=delegate{Exit();};
    Get<Button>("NightLightButton").Click+=delegate{try{Process.Start("ms-settings:nightlight");}catch(Exception e){Get<TextBlock>("StatusText").Text=e.Message;}};
-   ready=true;UpdateLabels();if(preview)return;
+   Window.SourceInitialized+=delegate{FitWindow();};brightness=new BrightnessUI(Get<StackPanel>("BrightnessPanel"),Get<TextBlock>("BrightnessStatus"),Get<Button>("RefreshBrightnessButton"),preview);ready=true;UpdateLabels();if(preview)return;
    resetSignal=new EventWaitHandle(false,EventResetMode.AutoReset,"Local\\AmbientTone.Reset");
    tray=new Forms.NotifyIcon();tray.Icon=System.Drawing.Icon.ExtractAssociatedIcon(Process.GetCurrentProcess().MainModule.FileName);tray.Text="原彩显示";tray.Visible=true;
    var menu=new Forms.ContextMenuStrip();menu.Items.Add("打开原彩显示",null,delegate{Show();});menu.Items.Add("恢复原始显示",null,delegate{Reset();});menu.Items.Add("恢复并退出",null,delegate{Exit();});tray.ContextMenuStrip=menu;tray.DoubleClick+=delegate{Show();};
@@ -198,6 +198,8 @@ namespace AmbientTone {
    SystemEvents.DisplaySettingsChanged+=DisplayChanged;SystemEvents.PowerModeChanged+=PowerChanged;SystemEvents.SessionEnding+=SessionEnding;
    timer=new DispatcherTimer();timer.Interval=TimeSpan.FromMilliseconds(1000);timer.Tick+=delegate{Tick();};timer.Start();
   }
+  void FitWindow(){var work=SystemParameters.WorkArea;double width=Math.Max(1,work.Width-24),height=Math.Max(1,work.Height-24);Window.MinWidth=Math.Min(560,width);Window.MinHeight=Math.Min(480,height);Window.Width=Math.Min(760,width);Window.Height=Math.Min(830,height);Window.MaxWidth=work.Width;Window.MaxHeight=work.Height;Window.WindowStartupLocation=WindowStartupLocation.Manual;Window.Left=work.Left+(work.Width-Window.Width)/2;Window.Top=work.Top+(work.Height-Window.Height)/2;}
+  public int VerifyBrightness(string path){Reset();try{return brightness.Verify(path);}finally{Reset();exiting=true;Window.Close();}}
   public int VerifyUI(string path) {
    var lines=new List<string>();int failures=0;Action<bool,string> check=delegate(bool ok,string name){lines.Add((ok?"PASS ":"FAIL ")+name);if(!ok)failures++;};
    try {
@@ -219,7 +221,7 @@ namespace AmbientTone {
     Get<ComboBox>("DayBox").SelectedIndex=settings.Night;check(settings.Day!=settings.Night&&Get<ComboBox>("DayBox").SelectedIndex==settings.Day,"Conflicting schedule selections are reverted");
     Get<CheckBox>("SolarBox").IsChecked=true;Get<Button>("ResetButton").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
     check(!settings.Enabled&&controller.Displays.All(d=>Model.Close(Native.Read(d.Name),d.Original,0)),"Reset button restores exact original display ramps");
-    check(Get<Button>("ResetButton").IsVisible,"Reset button remains visible without scrolling");
+    check(Get<Button>("ResetButton").IsVisible,"Reset button remains visible without scrolling");check(Window.ActualHeight<=SystemParameters.WorkArea.Height+1&&Window.ActualWidth<=SystemParameters.WorkArea.Width+1,"Window fits current screen work area at high scaling");
     if(!light.Available)check(!Get<ComboBoxItem>("SensorItem").IsEnabled,"Unsupported ambient sensor mode is disabled");
    }finally{Reset();exiting=true;Window.Close();File.WriteAllLines(path,lines);}
    return failures==0?0:1;
@@ -264,10 +266,10 @@ namespace AmbientTone {
   public void Reset(){ready=false;Get<CheckBox>("EnableBox").IsChecked=false;ready=true;settings.Enabled=false;SaveSettings();paused=false;current=6500;lastTemp=-1;Get<TextBlock>("StatusText").Text=controller.Restore();UpdateLabels();}
   public void Exit(){Reset();exiting=true;Window.Close();}
   public void Emergency(){try{if(controller!=null)controller.Restore();}catch{}}
-  void Cleanup(){if(exiting&&timer==null)return;exiting=true;if(timer!=null){timer.Stop();timer=null;}Emergency();SystemEvents.DisplaySettingsChanged-=DisplayChanged;SystemEvents.PowerModeChanged-=PowerChanged;SystemEvents.SessionEnding-=SessionEnding;if(tray!=null){tray.Visible=false;var ownedIcon=tray.Icon;tray.Dispose();if(ownedIcon!=null)ownedIcon.Dispose();tray=null;}if(resetSignal!=null)resetSignal.Dispose();}
+  void Cleanup(){if(exiting&&timer==null)return;if(brightness!=null){brightness.Dispose();brightness=null;}exiting=true;if(timer!=null){timer.Stop();timer=null;}Emergency();SystemEvents.DisplaySettingsChanged-=DisplayChanged;SystemEvents.PowerModeChanged-=PowerChanged;SystemEvents.SessionEnding-=SessionEnding;if(tray!=null){tray.Visible=false;var ownedIcon=tray.Icon;tray.Dispose();if(ownedIcon!=null)ownedIcon.Dispose();tray=null;}if(resetSignal!=null)resetSignal.Dispose();}
   void Show(){Window.Show();Window.WindowState=WindowState.Normal;Window.Activate();}
-  void DisplayChanged(object s,EventArgs e){Window.Dispatcher.BeginInvoke(new Action(delegate{if(exiting)return;Reset();controller.Refresh();Get<TextBlock>("StatusText").Text="显示设备发生变化，已恢复并关闭调节；请重新开启。";}));}
-  void PowerChanged(object s,PowerModeChangedEventArgs e){if(e.Mode==PowerModes.Suspend)Window.Dispatcher.Invoke(new Action(delegate{Reset();}));else if(e.Mode==PowerModes.Resume)Window.Dispatcher.BeginInvoke(new Action(delegate{if(exiting)return;controller.Refresh();Get<TextBlock>("StatusText").Text="电脑已唤醒，调节保持关闭；可重新开启。";}));}
+  void DisplayChanged(object s,EventArgs e){Window.Dispatcher.BeginInvoke(new Action(delegate{if(exiting)return;Reset();controller.Refresh();FitWindow();brightness.Refresh();Get<TextBlock>("StatusText").Text="显示设备发生变化，已恢复并关闭调节；请重新开启。";}));}
+  void PowerChanged(object s,PowerModeChangedEventArgs e){if(e.Mode==PowerModes.Suspend)Window.Dispatcher.Invoke(new Action(delegate{Reset();}));else if(e.Mode==PowerModes.Resume)Window.Dispatcher.BeginInvoke(new Action(delegate{if(exiting)return;controller.Refresh();brightness.Refresh();Get<TextBlock>("StatusText").Text="电脑已唤醒，调节保持关闭；可重新开启。";}));}
   void SessionEnding(object s,SessionEndingEventArgs e){Emergency();}
   bool IsStartup(){try{using(var key=Registry.CurrentUser.OpenSubKey("Software\\Microsoft\\Windows\\CurrentVersion\\Run"))return key!=null&&key.GetValue("AmbientTone")!=null;}catch{return false;}}
   void StartupChanged(object sender,RoutedEventArgs e){if(!ready)return;try{using(var key=Registry.CurrentUser.CreateSubKey("Software\\Microsoft\\Windows\\CurrentVersion\\Run")){if(Get<CheckBox>("StartupBox").IsChecked==true)key.SetValue("AmbientTone","\""+Process.GetCurrentProcess().MainModule.FileName+"\" --tray");else key.DeleteValue("AmbientTone",false);}}catch(Exception ex){ready=false;Get<CheckBox>("StartupBox").IsChecked=IsStartup();ready=true;Get<TextBlock>("StatusText").Text="开机启动设置失败："+ex.Message;}}
@@ -282,7 +284,7 @@ namespace AmbientTone {
     bool created;using(var mutex=new Mutex(true,"Local\\AmbientTone.Instance",out created)) {
      if(!created){if(args.Contains("--reset")){using(var signal=EventWaitHandle.OpenExisting("Local\\AmbientTone.Reset"))signal.Set();}else MessageBox.Show("原彩显示已经在运行。请从右下角托盘打开。","原彩显示");return 0;}
      try {
-      if(args.Contains("--display-test"))return DisplayTest(args[1]);if(args.Contains("--ui-test")){var prior=Storage.Load<Settings>("settings.xml");try{var testUI=new UI(false);testUI.Window.Show();testUI.Window.UpdateLayout();return testUI.VerifyUI(args[1]);}finally{if(prior!=null)Storage.Save("settings.xml",prior);else if(File.Exists(Storage.PathFor("settings.xml")))File.Delete(Storage.PathFor("settings.xml"));}}if(args.Contains("--crash-probe")){var c=new Controller();if(!c.Apply(5000,.55))return 1;File.WriteAllText(args[1],"Warm ramp applied; ending process without cleanup");Environment.Exit(23);}
+      if(args.Contains("--brightness-test")){var prior=Storage.Load<Settings>("settings.xml");try{var testUI=new UI(false);testUI.Window.Show();testUI.Window.UpdateLayout();return testUI.VerifyBrightness(args[1]);}finally{if(prior!=null)Storage.Save("settings.xml",prior);}}if(args.Contains("--display-test"))return DisplayTest(args[1]);if(args.Contains("--ui-test")){var prior=Storage.Load<Settings>("settings.xml");try{var testUI=new UI(false);testUI.Window.Show();testUI.Window.UpdateLayout();return testUI.VerifyUI(args[1]);}finally{if(prior!=null)Storage.Save("settings.xml",prior);else if(File.Exists(Storage.PathFor("settings.xml")))File.Delete(Storage.PathFor("settings.xml"));}}if(args.Contains("--crash-probe")){var c=new Controller();if(!c.Apply(5000,.55))return 1;File.WriteAllText(args[1],"Warm ramp applied; ending process without cleanup");Environment.Exit(23);}
       if(args.Contains("--reset")){MessageBox.Show(Storage.Recover(0),"原彩显示 · 恢复显示");return 0;}
       var app=new Application();app.ShutdownMode=ShutdownMode.OnMainWindowClose;var ui=new UI(false);
       app.DispatcherUnhandledException+=delegate(object s,DispatcherUnhandledExceptionEventArgs e){ui.Emergency();Storage.Log(e.Exception.ToString());MessageBox.Show("出现错误，已尝试恢复原始颜色。\n"+e.Exception.Message,"原彩显示");e.Handled=true;app.Shutdown(1);};

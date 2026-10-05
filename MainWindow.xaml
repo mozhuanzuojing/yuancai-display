@@ -7,6 +7,12 @@
  <Grid Background="#F4F5F2"><Grid.RowDefinitions><RowDefinition/><RowDefinition Height="Auto"/></Grid.RowDefinitions><ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto"><StackPanel Margin="32,26,32,24">
   <DockPanel><TextBlock Text="原彩显示" FontSize="30" FontWeight="SemiBold"/><TextBlock Text="BEIJING · UTC+8" FontSize="12" Foreground="#748278" Margin="14,18,0,0"/><CheckBox x:Name="EnableBox" Content="开启调节" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="16,0,0,0"/></DockPanel>
   <TextBlock Text="手动匹配房间灯光，也可按北京日照自动调节。" Margin="0,6,0,22" Foreground="#657569"/>
+  <Border Background="White" CornerRadius="14" Padding="22" Margin="0,0,0,16"><StackPanel>
+   <DockPanel><Button x:Name="RefreshBrightnessButton" Content="重新检测" DockPanel.Dock="Right" Margin="10,0,0,0" Padding="12,6"/><TextBlock Text="屏幕亮度" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center"/></DockPanel>
+   <TextBlock x:Name="BrightnessStatus" Text="正在检测硬件亮度…" TextWrapping="Wrap" FontSize="12" Foreground="#657569" Margin="0,10,0,12"/>
+   <StackPanel x:Name="BrightnessPanel"/>
+   <TextBlock Text="亮度独立于色温开关；关闭程序后保留当前亮度。" TextWrapping="Wrap" FontSize="12" Foreground="#758176"/>
+  </StackPanel></Border>
   <Border Background="#F4EBD8" CornerRadius="16" Padding="24" Margin="0,0,0,18"><Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="130"/></Grid.ColumnDefinitions>
    <StackPanel><TextBlock x:Name="StateText" Text="原始显示 · 调节未开启" FontSize="13"/><TextBlock x:Name="BeijingText" TextWrapping="Wrap" FontSize="12" Foreground="#6E705E" Margin="0,5,0,0"/><TextBlock x:Name="TemperatureText" Text="原始颜色" FontSize="40" FontWeight="SemiBold" Margin="0,5,0,3"/><TextBlock x:Name="ModeHint" Text="色温为估算值，实际观感取决于显示屏和校准。" TextWrapping="Wrap" Foreground="#6E705E"/></StackPanel>
    <Border Grid.Column="1" x:Name="PreviewSwatch" Background="White" CornerRadius="12" Margin="10,5,0,5" BorderBrush="#DFD5BD" BorderThickness="1"><StackPanel VerticalAlignment="Center"><TextBlock Text="Aa" FontSize="42" HorizontalAlignment="Center"/><TextBlock Text="白色预览" HorizontalAlignment="Center" FontSize="12"/></StackPanel></Border>
@@ -38,7 +44,7 @@
   </StackPanel></Border>
  </StackPanel></ScrollViewer><Border Grid.Row="1" Background="#F4F5F2" Padding="32,12,22,18"><StackPanel>  <TextBlock x:Name="StatusText" Text="正在检查显示设备…" TextWrapping="Wrap" FontSize="12" Foreground="#647467" Margin="0,0,0,8"/>
   <TextBlock Text="调节作用于整个桌面。HDR 开启时暂停；调色或修图时可一键恢复。" TextWrapping="Wrap" FontSize="12" Foreground="#758176" Margin="0,0,0,16"/>
-  <WrapPanel><Button x:Name="ResetButton" Content="恢复原始显示" Background="#244B3C" Foreground="White"/><Button x:Name="ExitButton" Content="恢复并退出"/><Button x:Name="NightLightButton" Content="Windows 夜间模式"/></WrapPanel>
+  <WrapPanel><Button x:Name="ResetButton" Content="恢复原始颜色" Background="#244B3C" Foreground="White"/><Button x:Name="ExitButton" Content="恢复颜色并退出"/><Button x:Name="NightLightButton" Content="Windows 夜间模式"/></WrapPanel>
 </StackPanel></Border></Grid>
 </Window>
 
