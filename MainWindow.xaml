@@ -1,0 +1,47 @@
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="原彩显示" Width="760" Height="830" MinWidth="680" MinHeight="650" WindowStartupLocation="CenterScreen" Background="#F4F5F2" FontFamily="Microsoft YaHei UI" FontSize="14">
+ <Window.Resources>
+  <Style TargetType="Button"><Setter Property="Padding" Value="18,10"/><Setter Property="Margin" Value="0,0,10,0"/><Setter Property="Background" Value="#E7EBE5"/><Setter Property="Foreground" Value="#253B32"/><Setter Property="BorderThickness" Value="0"/><Setter Property="Cursor" Value="Hand"/></Style>
+  <Style TargetType="ComboBox"><Setter Property="MinHeight" Value="36"/><Setter Property="VerticalContentAlignment" Value="Center"/></Style>
+  <Style TargetType="TextBlock"><Setter Property="Foreground" Value="#243B32"/></Style>
+ </Window.Resources>
+ <Grid Background="#F4F5F2"><Grid.RowDefinitions><RowDefinition/><RowDefinition Height="Auto"/></Grid.RowDefinitions><ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto"><StackPanel Margin="32,26,32,24">
+  <DockPanel><TextBlock Text="原彩显示" FontSize="30" FontWeight="SemiBold"/><TextBlock Text="BEIJING · UTC+8" FontSize="12" Foreground="#748278" Margin="14,18,0,0"/><CheckBox x:Name="EnableBox" Content="开启调节" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="16,0,0,0"/></DockPanel>
+  <TextBlock Text="手动匹配房间灯光，也可按北京日照自动调节。" Margin="0,6,0,22" Foreground="#657569"/>
+  <Border Background="#F4EBD8" CornerRadius="16" Padding="24" Margin="0,0,0,18"><Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="130"/></Grid.ColumnDefinitions>
+   <StackPanel><TextBlock x:Name="StateText" Text="原始显示 · 调节未开启" FontSize="13"/><TextBlock x:Name="BeijingText" TextWrapping="Wrap" FontSize="12" Foreground="#6E705E" Margin="0,5,0,0"/><TextBlock x:Name="TemperatureText" Text="原始颜色" FontSize="40" FontWeight="SemiBold" Margin="0,5,0,3"/><TextBlock x:Name="ModeHint" Text="色温为估算值，实际观感取决于显示屏和校准。" TextWrapping="Wrap" Foreground="#6E705E"/></StackPanel>
+   <Border Grid.Column="1" x:Name="PreviewSwatch" Background="White" CornerRadius="12" Margin="10,5,0,5" BorderBrush="#DFD5BD" BorderThickness="1"><StackPanel VerticalAlignment="Center"><TextBlock Text="Aa" FontSize="42" HorizontalAlignment="Center"/><TextBlock Text="白色预览" HorizontalAlignment="Center" FontSize="12"/></StackPanel></Border>
+  </Grid></Border>
+  <Border Background="White" CornerRadius="14" Padding="22" Margin="0,0,0,16"><StackPanel>
+   <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="色温漂移" FontSize="16" FontWeight="SemiBold"/><TextBlock Grid.Column="1" x:Name="DriftValue" Text="0 K" FontSize="16"/></Grid>
+   <Slider x:Name="DriftSlider" Minimum="-1500" Maximum="1500" Value="0" TickFrequency="50" TickPlacement="BottomRight" SmallChange="50" LargeChange="500" IsSnapToTickEnabled="True" Margin="0,14,0,0" AutomationProperties.Name="色温漂移，负值更暖，正值更冷"/>
+   <Grid Margin="0,4,0,10"><TextBlock Text="−1500 K · 更暖" FontSize="12" Foreground="#758176"/><TextBlock Text="0" HorizontalAlignment="Center" FontSize="12" Foreground="#758176"/><TextBlock Text="+1500 K · 更冷" HorizontalAlignment="Right" FontSize="12" Foreground="#758176"/></Grid>
+   <TextBlock x:Name="DriftTargetText" Text="基础 5700 K · 漂移 0 K → 目标 5700 K" TextWrapping="Wrap" FontSize="12" Foreground="#657569"/>
+   <DockPanel Margin="0,12,0,0"><Button x:Name="DriftResetButton" Content="漂移归零" DockPanel.Dock="Right" Margin="10,0,0,0"/><TextBlock Text="在当前模式上微调，目标范围 3600–6500 K。" TextWrapping="Wrap" FontSize="12" Foreground="#758176" VerticalAlignment="Center"/></DockPanel>
+  </StackPanel></Border>
+  <Border Background="White" CornerRadius="14" Padding="22" Margin="0,0,0,16"><StackPanel>
+   <TextBlock Text="当前提供手动与时段调色；苹果式环境光测色适应尚未实现。" TextWrapping="Wrap" FontSize="12" Foreground="#758176" Margin="0,0,0,12"/><TextBlock Text="调节方式" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,12"/>
+   <ComboBox x:Name="ModeBox"><ComboBoxItem Content="手动 · 按房间光线调节"/><ComboBoxItem Content="北京日照 · 按北京时间自动调节"/><ComboBoxItem x:Name="SensorItem" Content="环境光 · 根据照度估算（不测灯光颜色）"/></ComboBox>
+   <TextBlock x:Name="SensorText" Text="正在检测环境光传感器…" TextWrapping="Wrap" FontSize="12" Foreground="#758176" Margin="0,10,0,15"/>
+   <StackPanel x:Name="ManualPanel"><Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="手动色温"/><TextBlock Grid.Column="1" x:Name="ManualValue" Text="5000 K"/></Grid>
+   <Slider x:Name="TemperatureSlider" Minimum="3600" Maximum="6500" Value="5000" TickFrequency="100" IsSnapToTickEnabled="True" Margin="0,10,0,0"/>
+   <Grid Margin="0,4,0,14"><TextBlock Text="暖黄 · 3600 K" FontSize="12" Foreground="#758176"/><TextBlock Text="原始白色 · 6500 K" HorizontalAlignment="Right" FontSize="12" Foreground="#758176"/></Grid>
+   <WrapPanel><Button x:Name="WarmButton" Content="暖灯  4200 K"/><Button x:Name="SoftButton" Content="柔和  5000 K"/><Button x:Name="NeutralButton" Content="原始白色"/></WrapPanel></StackPanel>
+   <Grid Margin="0,18,0,0"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="适应强度"/><TextBlock Grid.Column="1" x:Name="StrengthValue" Text="75%"/></Grid>
+   <Slider x:Name="StrengthSlider" Minimum="0" Maximum="100" Value="75" TickFrequency="5" IsSnapToTickEnabled="True" Margin="0,9,0,0"/>
+   <TextBlock Text="强度越低，调节越轻。0% 恢复原始颜色。" FontSize="12" Foreground="#758176" Margin="0,6,0,0"/>
+  </StackPanel></Border>
+  <Border Background="White" CornerRadius="14" Padding="22" Margin="0,0,0,16"><StackPanel>
+   <TextBlock Text="北京 · 昼夜设置" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,12"/>
+   <CheckBox x:Name="SolarBox" Content="跟随北京日出 / 日落（每日自动更新）" Margin="0,0,0,10"/><Grid x:Name="FixedScheduleGrid"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="20"/><ColumnDefinition/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="白天开始 · 5700 K" FontSize="12" Margin="0,0,0,6"/><ComboBox x:Name="DayBox"/></StackPanel><StackPanel Grid.Column="2"><TextBlock Text="夜晚开始 · 4200 K" FontSize="12" Margin="0,0,0,6"/><ComboBox x:Name="NightBox"/></StackPanel></Grid>
+   <TextBlock Text="在开始时间之后，用 60 分钟逐渐切换。" Foreground="#758176" FontSize="12" Margin="0,10,0,0"/>
+   <WrapPanel Margin="0,16,0,0"><CheckBox x:Name="StartupBox" Content="登录 Windows 时启动" Margin="0,0,24,0"/><CheckBox x:Name="TrayBox" Content="关闭窗口后留在托盘" IsChecked="True"/></WrapPanel>
+  </StackPanel></Border>
+ </StackPanel></ScrollViewer><Border Grid.Row="1" Background="#F4F5F2" Padding="32,12,22,18"><StackPanel>  <TextBlock x:Name="StatusText" Text="正在检查显示设备…" TextWrapping="Wrap" FontSize="12" Foreground="#647467" Margin="0,0,0,8"/>
+  <TextBlock Text="调节作用于整个桌面。HDR 开启时暂停；调色或修图时可一键恢复。" TextWrapping="Wrap" FontSize="12" Foreground="#758176" Margin="0,0,0,16"/>
+  <WrapPanel><Button x:Name="ResetButton" Content="恢复原始显示" Background="#244B3C" Foreground="White"/><Button x:Name="ExitButton" Content="恢复并退出"/><Button x:Name="NightLightButton" Content="Windows 夜间模式"/></WrapPanel>
+</StackPanel></Border></Grid>
+</Window>
+
+
+
+

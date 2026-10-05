@@ -1,0 +1,7 @@
+device,lighting,patch,x,y,luminance_cd_m2,true_tone
+apple,daylight,white,,,,on
+windows,daylight,white,,,,na
+apple,warm_lamp,white,,,,on
+windows,warm_lamp,white,,,,na
+apple,cool_lamp,white,,,,on
+windows,cool_lamp,white,,,,na

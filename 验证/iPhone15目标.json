@@ -1,0 +1,17 @@
+{
+  "reference_device": "Apple iPhone 15 (standard, 2023)",
+  "display_technology": "OLED",
+  "reference_application": "Safari",
+  "content": "fixed sRGB SDR patches",
+  "true_tone": "on",
+  "night_shift": "off",
+  "initial_comparison_auto_brightness": "off",
+  "reference_ios_version": null,
+  "reference_measured_white_xyY": null,
+  "windows_measured_white_xyY": null,
+  "ambient_measured_color_and_lux": null,
+  "calibration_status": "awaiting_physical_reference",
+  "alignment_verified": false,
+  "time_reference": "Asia/Shanghai, Beijing UTC+8",
+  "note": "No measured Apple white point or calibration gain is invented."
+}

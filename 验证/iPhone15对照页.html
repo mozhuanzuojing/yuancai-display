@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="color-scheme" content="light"><title>iPhone 15 原彩对照页</title>
+<style>
+:root{color-scheme:light;font-family:system-ui,-apple-system,"Microsoft YaHei UI",sans-serif;background:#101820;color:#f3f5f4}*{box-sizing:border-box}body{margin:0;padding:20px max(18px,env(safe-area-inset-right)) 26px max(18px,env(safe-area-inset-left));min-height:100svh}main{max-width:760px;margin:auto}h1{font-size:23px;font-weight:650;margin:4px 0 8px}p{font-size:13px;line-height:1.7;color:#b9c7c3;margin:6px 0 16px}nav{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}button{border:1px solid #64786e;border-radius:7px;background:#25392f;color:#fff;padding:10px 13px;font-size:14px;cursor:pointer}button[aria-pressed=true]{background:#e7f0e9;color:#152a21}.field{width:100%;aspect-ratio:2 / 1;background:#fff;display:grid;grid-template-columns:repeat(6,1fr);grid-template-rows:repeat(3,1fr);overflow:hidden}.tile{min-width:0;min-height:0}.caption{font-size:13px;color:#d1ddd7;margin-top:12px}.steps{font-size:13px;line-height:1.85;color:#c0ccc7;padding-left:20px;margin:15px 0}.badge{font-size:12px;color:#bdc7be;border-top:1px solid #344139;padding-top:16px}details{margin-top:16px}summary{font-size:13px;cursor:pointer}a{color:#b9e1cd}.focus .intro,.focus nav,.focus .steps,.focus details,.focus .badge,.focus .caption{display:none}.focus main{max-width:none}.focus body{padding:0;display:flex;min-height:100svh;align-items:center}.focus .field{width:100vw;aspect-ratio:2 / 1}.exit-focus{display:none}.focus .exit-focus{display:block;position:fixed;right:12px;bottom:max(12px,env(safe-area-inset-bottom));opacity:.75;font-size:12px}body:before{content:'';position:fixed;pointer-events:none;inset:0;border:0}
+</style></head><body><main>
+<div class="intro"><h1>iPhone 15 · 原彩对照</h1><p>手机与电脑打开同一页、选择同一色块，再放在同一灯光下比较。当前页面提供测试内容，尚未验证两块屏幕已对齐。</p></div>
+<nav aria-label="选择色块"><button data-mode="chart" aria-pressed="true">综合色块</button><button data-mode="white" aria-pressed="false">白色</button><button data-mode="gray" aria-pressed="false">中灰</button><button data-mode="light" aria-pressed="false">浅灰</button><button id="focus">专注色块</button></nav>
+<div id="field" class="field" aria-label="18 个固定 sRGB 色块"></div><div id="caption" class="caption">综合色块 · 18 个固定 sRGB 色块 · 普通 SDR 内容</div>
+<ol class="steps"><li>iPhone：开启原彩显示，关闭夜览；本轮比较先关闭自动亮度，固定亮度。</li><li>电脑：关闭其他夜间滤镜，使用原彩显示手动模式；先匹配亮度，再匹配冷暖。</li><li>不要遮挡手机顶部的环境光传感器。两块屏幕尽量正面观察，避免反光。</li><li>先看白色和中灰，再看综合色块。在日光、暖灯、冷灯下分别记录。</li></ol>
+<div class="badge">目标：iPhone 15 标准版 · Safari · 原彩开启 · 普通 SDR。页面自身不会模拟或控制 Apple 原彩，也不会用截图判断光学一致性。</div>
+<details><summary>为什么截图不能证明已对齐？</summary><p>本机测试中，显卡输出曲线改变后截图仍逐像素相同。实际颜色需要并排目视或测量仪比较。照片可辅助观察，不能保证完全一致。这里显示的 RGB 数字是源像素，不是屏幕实际色度或亮度。</p><p><a href="https://support.apple.com/zh-cn/111831">iPhone 15 官方规格</a> · <a href="https://support.apple.com/zh-cn/109351">原彩与夜览说明</a></p></details>
+</main><button class="exit-focus" id="exit">返回设置</button>
+<script>
+'use strict';
+const colors=[[255,255,255],[192,192,192],[128,128,128],[64,64,64],[16,16,16],[0,0,0],[255,0,0],[0,255,0],[0,0,255],[0,255,255],[255,0,255],[255,255,0],[194,150,130],[115,82,68],[230,125,35],[91,145,190],[72,112,64],[224,220,205]];
+const field=document.querySelector('#field'),caption=document.querySelector('#caption');
+function select(mode){field.replaceChildren();field.style.display=mode==='chart'?'grid':'block';if(mode==='chart'){for(const rgb of colors){const tile=document.createElement('div');tile.className='tile';tile.style.backgroundColor=`rgb(${rgb.join(',')})`;field.appendChild(tile);}caption.textContent='综合色块 · 18 个固定 sRGB 色块 · 普通 SDR 内容';}else{const value={white:255,gray:128,light:192}[mode];field.style.backgroundColor=`rgb(${value},${value},${value})`;caption.textContent=({white:'白色',gray:'中灰',light:'浅灰'}[mode])+` · sRGB (${value}, ${value}, ${value})`;}for(const b of document.querySelectorAll('[data-mode]'))b.setAttribute('aria-pressed',String(b.dataset.mode===mode));field.setAttribute('aria-label',caption.textContent);}
+for(const button of document.querySelectorAll('[data-mode]'))button.addEventListener('click',()=>select(button.dataset.mode));
+document.querySelector('#focus').addEventListener('click',()=>document.documentElement.classList.add('focus'));
+document.querySelector('#exit').addEventListener('click',()=>document.documentElement.classList.remove('focus'));
+select('chart');
+</script></body></html>
